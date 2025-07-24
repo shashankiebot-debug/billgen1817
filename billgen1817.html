@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Hotel Navadeep Bill Generator</title>
+<style>
+:root{--accent:#176bad;--danger:#e52c24;--ok:#1b8e3e;--panel:#f5fafc;--border:#d3dfe8;--ink:#173958;--invoice-w:650px}
+body{font-family:Arial,sans-serif;margin:0;
+background:url("https://raw.githubusercontent.com/shashankiebot-debug/navadeep-logo/main/hotel%20navadeep%20logo%20.png") no-repeat center/360px fixed}
+.wrapper{max-width:1280px;margin:30px auto;display:grid;gap:24px;grid-template-columns:1fr minmax(var(--invoice-w),1fr)}
+@media(max-width:900px){.wrapper{grid-template-columns:1fr}}
+form{background:rgba(255,255,255,.97);padding:24px;border-radius:8px;box-shadow:0 0 10px #bbb}
+label{display:block;font-weight:bold;color:var(--ink);margin-top:12px}
+input,textarea,button{font-size:1rem;border:1px solid var(--border);border-radius:4px;padding:8px 10px;box-sizing:border-box;width:100%}
+textarea{resize:vertical}
+input[type="number"]{text-align:right}
+table{width:100%;border-collapse:collapse;margin-top:14px}
+th,td{border:1px solid #e2e2e2;padding:7px}th{background:#e6f5fc;text-align:left}
+.add-btn,.action-btn{background:var(--accent);color:#fff;cursor:pointer}.action-btn{padding:3px 12px}
+.add-btn:hover{background:#124d89}.action-btn:hover{background:#094c9e}
+.buttons{margin-top:18px;text-align:center}.buttons>button{width:48%;margin:4px 1%;padding:10px 0;color:#fff;border:none;border-radius:5px}
+.saveBtn{background:var(--ok)}.previewBtn{background:var(--accent)}.saveBtn:hover{background:#0f6231}.previewBtn:hover{background:#124d89}
+.checkboxRow{display:flex;align-items:center;gap:10px;margin-top:10px}.checkboxRow input[type=checkbox]{transform:scale(1.2)}
+#invoice{width:var(--invoice-w);margin:auto;background:#fff;padding:24px;border:1px solid #ccc;position:relative}
+#invoice:before{content:"";position:absolute;inset:0;z-index:0;
+background:url("https://raw.githubusercontent.com/shashankiebot-debug/navadeep-logo/main/hotel%20navadeep%20logo%20.png") no-repeat center/400px;opacity:.08;pointer-events:none}
+#invoice *{position:relative;z-index:1}
+.heading{text-align:center;margin-bottom:8px}.heading img{height:75px}
+.summary p{margin:4px 0}.amountWords{font-style:italic;font-weight:bold;margin-top:6px}
+.signRow{display:flex;justify-content:space-between;margin-top:40px}.signBox{width:45%;height:70px;border:1px solid #aaa;text-align:center;padding-top:28px;font-weight:bold;color:#555}
+.hideForPDF{}
+#gstNote{color:#e52c24 !important;}
+</style>
+</head>
+<body>
+<div class="wrapper">
+<form id="billForm" autocomplete="off">
+  <label>Customer Name <input id="custName" required></label>
+  <label>Phone Number
+    <input id="phoneNumber" required pattern="\d{10}" title="Enter 10 digit phone number">
+  </label>
+  <label>Address
+    <textarea id="address" rows="2" required style="width:100%;"></textarea>
+  </label>
+  <label>Date <input type="date" id="billDate" required></label>
+  <label>Items</label>
+  <table id="itemTable">
+    <thead>
+      <tr><th>Description</th><th>Qty</th><th>Price ₹</th><th>Total ₹</th><th></th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><input class="desc" required></td>
+        <td><input type="number" class="qty" min="1" value="1"></td>
+        <td><input type="number" class="rate" min="0" step="0.01" value="0"></td>
+        <td><input class="rowTotal" readonly></td>
+        <td><button type="button" class="action-btn" onclick="delRow(this)">×</button></td>
+      </tr>
+    </tbody>
+  </table>
+  <button type="button" class="add-btn" onclick="addRow()">+ Add Item</button>
+  <label>GST Number <input value="29AAKFH3418F1ZD" id="gstNo" readonly style="background:#eef9e8;font-weight:bold"></label>
+  <label>Discount ₹ <input type="number" id="discount" min="0" step="0.01" value="0"></label>
+  <div class="checkboxRow hideForPDF">
+    <input type="checkbox" id="gstAsDisc">
+    <label for="gstAsDisc" style="font-weight:bold;color:#176bad">GST amount is given as discount</label>
+  </div>
+  <label>GST Rate % <input type="number" id="gstRate" value="18" min="0" max="100"></label>
+  <div class="buttons hideForPDF">
+    <button type="button" class="previewBtn" onclick="updateInvoice()">Preview Bill</button>
+    <button type="button" class="saveBtn" onclick="downloadDialog()">Save / Print</button>
+  </div>
+</form>
+
+<div id="invoice">
+  <div class="heading">
+    <img src="https://raw.githubusercontent.com/shashankiebot-debug/navadeep-logo/main/hotel%20navadeep%20logo%20.png" alt="Logo" />
+    <h2>Hotel Navadeep</h2>
+    <p><strong>Address:</strong> Basement Floor, Linking Tower, Maidan 2nd Cross Road, Mangalore 575001</p>
+    <p><strong>Phone:</strong> 9141736802</p>
+    <p><strong>GSTIN:</strong> 29AAKFH3418F1ZD</p>
+  </div>
+  <p><strong>Customer:</strong> <span id="outCust">—</span></p>
+  <p><strong>Phone:</strong> <span id="outPhone">—</span></p>
+  <p><strong>Address:</strong> <span id="outAddress">—</span></p>
+  <p><strong>Date:</strong> <span id="outDate">—</span></p>
+  <table id="outTable">
+    <thead>
+      <tr><th>Description</th><th>Qty</th><th>Price ₹</th><th>Total ₹</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div class="summary">
+    <p><strong>Subtotal ₹:</strong> <span id="outSub">0.00</span></p>
+    <p><strong>Discount ₹:</strong> <span id="outDisc">0.00</span></p>
+    <p><strong>GST (<span id="outRate">18</span>% ) ₹:</strong> <span id="outGST">0.00</span></p>
+    <p><strong>GST Discount ₹:</strong> <span id="outGSTDisc">0.00</span></p>
+    <p><strong>Total ₹:</strong> <span id="outTotal">0.00</span></p>
+    <p class="amountWords" id="outWords"></p>
+    <p id="gstNote" style="display:none;font-weight:bold">GST has been provided as a full discount.</p>
+  </div>
+  <div class="signRow">
+    <div class="signBox">Stamp</div>
+    <div class="signBox">Authorised Signatory</div>
+  </div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+const $ = s => document.querySelector(s),
+      $$ = s => document.querySelectorAll(s);
+
+function addRow(){
+  const r = $('#itemTable tbody tr').cloneNode(true);
+  r.querySelectorAll('input').forEach(i => {
+    if(i.classList.contains('qty')) i.value = 1;
+    else if(i.classList.contains('rate')) i.value = 0;
+    else i.value = '';
+  });
+  $('#itemTable tbody').append(r);
+}
+function delRow(btn){
+  const tb = btn.closest('tbody');
+  if(tb.rows.length > 1){
+    btn.parentNode.parentNode.remove();
+    updateInvoice();
+  }
+}
+
+['custName','phoneNumber','address','billDate','discount','gstRate','gstAsDisc'].forEach(id =>
+  $('#'+id).addEventListener('input', updateInvoice)
+);
+$('#itemTable').addEventListener('input', updateInvoice);
+
+const nf = v => (+v||0).toFixed(2);
+
+function updateInvoice(){
+  $('#outCust').textContent = $('#custName').value || '—';
+  $('#outPhone').textContent = $('#phoneNumber').value || '—';
+  $('#outAddress').textContent = $('#address').value || '—';
+  $('#outDate').textContent = $('#billDate').value || '—';
+
+  let sub=0;
+  const outBody = $('#outTable tbody');
+  outBody.innerHTML = '';
+  $$('#itemTable tbody tr').forEach(r => {
+    const d = r.querySelector('.desc').value,
+          q = +r.querySelector('.qty').value || 0,
+          p = +r.querySelector('.rate').value || 0,
+          t = q * p;
+    r.querySelector('.rowTotal').value = q && p ? nf(t) : '';
+    if(d && q && p){
+      sub += t;
+      outBody.insertAdjacentHTML('beforeend',
+        `<tr><td>${d}</td><td>${q}</td><td>₹${nf(p)}</td><td>₹${nf(t)}</td></tr>`
+      );
+    }
+  });
+
+  const userDisc = +$('#discount').value || 0;
+  const gstRate = +$('#gstRate').value || 0;
+  const taxable = Math.max(0, sub - userDisc);
+
+  let gst = 0, gstDisc = 0, total = taxable;
+  if($('#gstAsDisc').checked){
+    gst = 0;
+    gstDisc = taxable * gstRate / 100;
+    total = taxable;
+    $('#gstNote').style.display = '';
+  } else {
+    gst = taxable * gstRate / 100;
+    gstDisc = 0;
+    total = taxable + gst;
+    $('#gstNote').style.display = 'none';
+  }
+
+  $('#outSub').textContent = nf(sub);
+  $('#outDisc').textContent = nf(userDisc);
+  $('#outRate').textContent = gstRate;
+  $('#outGST').textContent = nf(gst);
+  $('#outGSTDisc').textContent = nf(gstDisc);
+  $('#outTotal').textContent = nf(total);
+  $('#outWords').textContent = 'Amount (in words): ' + toWords(total);
+}
+
+function toWords(n){
+  const O = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen',
+            'Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'],
+        T = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'],
+        S = ['','Thousand','Lakh','Crore'];
+  if(!n) return 'Zero Rupees Only';
+  n = n.toFixed(2).split('.');
+  let num = +n[0], ps = +n[1];
+  const seg = v => {
+    let s = '';
+    if(v > 99){
+      s += O[Math.floor(v/100)] + ' Hundred ';
+      v %= 100;
+    }
+    if(v > 19){
+      s += T[Math.floor(v/10)] + ' ';
+      v %= 10;
+    }
+    if(v) s += O[v] + ' ';
+    return s.trim();
+  };
+  let w='', i=0;
+  while(num){
+    const chunk = i ? num%100 : num%1000;
+    if(chunk) w = seg(chunk) + ' ' + (S[i] && chunk ? S[i] : '') + ' ' + w;
+    num = Math.floor(i ? num/100 : num/1000);
+    i++;
+  }
+  w = w.trim() + ' Rupees';
+  if(ps) w += ' and ' + seg(ps) + ' Paise';
+  return w + ' Only';
+}
+
+function downloadDialog(){
+  updateInvoice();
+  confirm('Save bill as PDF?\n(Choose "Cancel" for HTML)') ? download('pdf') : download('html');
+}
+function download(fmt){
+  if(fmt === 'html'){
+    const blob = new Blob(['<!doctype html>'+$('#invoice').outerHTML], {type:'text/html'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'Hotel_Navadeep_Bill_'+Date.now()+'.html';
+    document.body.append(a);
+    a.click();
+    a.remove();
+    return;
+  }
+  $$('.hideForPDF').forEach(e => e.style.display = 'none');
+  html2canvas($('#invoice'), {scale:3, useCORS:true}).then(cv => {
+    const pdf = new jspdf.jsPDF({unit:'pt', format:'a4'});
+    const w = pdf.internal.pageSize.getWidth() - 40,
+          h = w * (cv.height / cv.width);
+    pdf.addImage(cv, 'PNG', 20, 20, w, h);
+    pdf.save('Hotel_Navadeep_Bill_'+Date.now()+'.pdf');
+    $$('.hideForPDF').forEach(e => e.style.display = '');
+  });
+}
+
+updateInvoice();
+</script>
+</body>
+</html>
